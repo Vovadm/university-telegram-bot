@@ -1,14 +1,14 @@
-import os
 import asyncio
 import logging
-
-from dotenv import load_dotenv
-from app.handlers import router
-from db.users import async_main, SessionLocalUsers
-from db.universiries import SessionLocalUniversity
-from sqlalchemy import text
+import os
 
 from aiogram import Bot, Dispatcher
+from dotenv import load_dotenv
+from sqlalchemy import text
+
+from app.handlers import router
+from db.universiries import SessionLocalUniversity
+from db.users import async_main, SessionLocalUsers
 
 
 async def keep_db_connection_alive():

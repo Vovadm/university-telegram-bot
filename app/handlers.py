@@ -157,7 +157,7 @@ async def process_city(message: types.Message, state: FSMContext):
 async def process_subject(
     callback_query: types.CallbackQuery, state: FSMContext
 ):
-    subject = callback_query.data[len("sub_") :]
+    subject = callback_query.data[len("sub_"):]
     await state.update_data(current_subject=subject)
     subjects_map = {
         "rus": "Русский",
@@ -554,7 +554,7 @@ async def send_specialization_keyboard(message: Message):
         for name, key in specialization_mapping.items()
     ]
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[buttons[i : i + 2] for i in range(0, len(buttons), 2)]
+        inline_keyboard=[buttons[i: i + 2] for i in range(0, len(buttons), 2)]
     )
     await message.answer("Выберите специальность:", reply_markup=keyboard)
 
@@ -850,7 +850,7 @@ async def navigate_pages(callback: types.CallbackQuery, state: FSMContext):
     university_list = "\n".join(
         f"{i + 1}. {university.name}"
         for i, university in enumerate(
-            matching_universities[page_number * 5 : (page_number + 1) * 5]
+            matching_universities[page_number * 5: (page_number + 1) * 5]
         )
     )
 
