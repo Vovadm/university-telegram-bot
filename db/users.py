@@ -75,6 +75,14 @@ class Specialization(Base):
     tg_id = mapped_column(BigInteger)
 
 
+async def create_tables():
+    async with engine_users.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    async with engine_users.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
 async def recreate_specializations_table():
     async with engine_users.begin() as conn:
         await conn.run_sync(
@@ -134,16 +142,10 @@ async def sync_specializations():
 async def async_main():
     try:
         async with engine_users.begin():
-            logging.info(
-                "Starting the recreation of the specializations table."
-            )
             await recreate_specializations_table()
-            logging.info("Recreation of the specializations table completed.")
-            logging.info("Starting synchronization of specializations.")
             await sync_specializations()
-            logging.info("Synchronization completed successfully.")
     except Exception as e:
-        logging.error(f"An error occurred during synchronization: {e}")
+        logging.error(e)
 
 
 if __name__ == "__main__":

@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 @router.message(CommandStart())
-async def start(message: Message):
+async def start(message: Message, state: FSMContext):
+    await state.clear()
     welcome_message = (
         "Добро пожаловать, здесь мы поможем тебе найти университет по твоим "
         "баллам ЕГЭ.\nВоспользуйся /help если что-то непонятно!"
@@ -62,6 +63,7 @@ async def about(message: types.Message):
 @router.message(F.text == "/change_data")
 @router.message(F.text == "Внести данные")
 async def ask_to_clear_data(message: Message, state: FSMContext):
+    await state.clear()
     async with SessionLocalUsers() as session:
         async with session.begin():
 
@@ -157,7 +159,7 @@ async def process_city(message: types.Message, state: FSMContext):
 async def process_subject(
     callback_query: types.CallbackQuery, state: FSMContext
 ):
-    subject = callback_query.data[len("sub_"):]
+    subject = callback_query.data[len("sub_") :]
     await state.update_data(current_subject=subject)
     subjects_map = {
         "rus": "Русский",
@@ -554,7 +556,7 @@ async def send_specialization_keyboard(message: Message):
         for name, key in specialization_mapping.items()
     ]
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[buttons[i: i + 2] for i in range(0, len(buttons), 2)]
+        inline_keyboard=[buttons[i : i + 2] for i in range(0, len(buttons), 2)]
     )
     await message.answer("Выберите специальность:", reply_markup=keyboard)
 
@@ -584,8 +586,7 @@ async def process_specialization(
 
             if not user_spec:
                 logging.info(
-                    f"Создание новой специализации "
-                    f"для пользователя {user_id}"
+                    f"Создание новой специализации для пользователя {user_id}"
                 )
                 user_spec = Specialization(tg_id=user_id)
                 result = await session.execute(
@@ -617,18 +618,22 @@ async def process_specialization(
             existing_columns = [row[0] for row in result.fetchall()]
 
             logging.info(
-                f"Доступные столбцы в таблице specializations: "
-                f"{existing_columns}"
+                f"Доступные столбцы в таблице specializations: {existing_columns}"
             )
 
             if specialization in existing_columns:
                 new_value = True
+                logging.info(
+                    f"Запуск обновления для столбца {specialization} с "
+                    f"значением {new_value}"
+                )
+
+                query = text(
+                    f"UPDATE specializations SET {specialization} = :value "
+                    "WHERE tg_id = :tg_id"
+                )
                 await session.execute(
-                    text(
-                        f"UPDATE specializations SET {specialization} = :value"
-                        "WHERE tg_id = :tg_id"
-                    ),
-                    {"value": new_value, "tg_id": user_id},
+                    query, {"value": new_value, "tg_id": user_id}
                 )
 
                 updated_value_query = await session.execute(
@@ -641,8 +646,8 @@ async def process_specialization(
                 updated_value = updated_value_query.scalar()
 
                 logging.info(
-                    f"Текущее значение для столбца {specialization} после "
-                    f"изменения: {updated_value}."
+                    f"Текущее значение для столбца {specialization} после изменения: "
+                    f"{updated_value}."
                 )
             else:
                 logging.error(
@@ -850,7 +855,7 @@ async def navigate_pages(callback: types.CallbackQuery, state: FSMContext):
     university_list = "\n".join(
         f"{i + 1}. {university.name}"
         for i, university in enumerate(
-            matching_universities[page_number * 5: (page_number + 1) * 5]
+            matching_universities[page_number * 5 : (page_number + 1) * 5]
         )
     )
 

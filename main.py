@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from app.handlers import router
 from db.universiries import SessionLocalUniversity
-from db.users import async_main, SessionLocalUsers
+from db.users import async_main, create_tables, SessionLocalUsers
 
 
 async def keep_db_connection_alive():
@@ -23,6 +23,7 @@ async def keep_db_connection_alive():
 
 
 async def main():
+    await create_tables()
     load_dotenv()
     await async_main()
     bot = Bot(token=os.getenv("TOKEN"))

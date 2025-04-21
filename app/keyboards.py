@@ -54,7 +54,7 @@ def subjects_keyboard():
         for rus_name, eng_name in subjects.items()
     ]
 
-    grouped_buttons = [buttons[i: i + 2] for i in range(0, len(buttons), 2)]
+    grouped_buttons = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
     grouped_buttons.append(
         [InlineKeyboardButton(text="Сохранить данные", callback_data="save")]
     )
