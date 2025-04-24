@@ -1,303 +1,232 @@
-from os import getenv
-from time import sleep
+import os
+import re
+import time
 
 from dotenv import load_dotenv
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.edge.service import Service
-from selenium.webdriver.support import expected_conditions as ec
-from selenium.webdriver.support.ui import WebDriverWait
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, create_engine, inspect, Integer, String, text
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-from db.universiries import Moscow
 
 load_dotenv()
-
-DATABASE_URI = getenv("DB_URL")
+DATABASE_URI = os.getenv("UNIV_SQL_URL")
 engine = create_engine(DATABASE_URI, echo=True)
 Base = declarative_base()
 
 
-# ! Создание новой таблицы
-# Base.metadata.drop_all(engine)
-# Base.metadata.create_all(engine)
+class Moscow(Base):
+    __tablename__ = "moscow"
 
-Session = sessionmaker(bind=engine)
-session = Session()
+    ID = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    coast = Column(String(255), nullable=True)
+    bud_places = Column(String(255), nullable=True)
+    pay_places = Column(String(255), nullable=True)
+    bud_score = Column(String(255), nullable=True)
+    pay_score = Column(String(255), nullable=True)
+    url = Column(String(255), nullable=True)
 
 
-
-driver_path = getenv("DRIVER_PATH")
+driver_path = os.getenv("DRIVER_PATH")
 service = Service(driver_path)
 driver = webdriver.Edge(service=service)
 
+
+def add_column_if_not_exists(table_name, column_name):
+
+    inspector = inspect(engine)
+    if column_name not in [
+        col["name"] for col in inspector.get_columns(table_name)
+    ]:
+        with engine.connect() as connection:
+            connection.execute(
+                text(
+                    f"ALTER TABLE `{table_name}` ADD COLUMN `{column_name}` BOOLEAN DEFAULT FALSE"
+                )
+            )
+
+
+#### Создание новой таблицы
+# Base = Base
+# Base.metadata.drop_all(engine)
+# Base.metadata.create_all(engine)
+
+
+SessionUniversity2 = sessionmaker(bind=engine)
+session = SessionUniversity2()
+
+
 try:
-    print("1")
 
-    # ! город/бюджетные места/платные места/названия/URL
-    driver.get("https://vuzopedia.com/moskva/")
+    for page in range(1, 17):
 
-    for i in range(1, 175):
-
-        name_xpath = f"/html/body/div/section/article/div[3]/article[{i}]/a/h3"
-
-        budget_xpath = f"/html/body/div/section/article/div[3]/article[{i}]/a/div[2]/div[1]/span"
-
-        pay_xpath = f"/html/body/div/section/article/div[3]/article[{i}]/a/div[2]/div[2]/span"
-
-        name_element = WebDriverWait(driver, 10).until(
-            ec.presence_of_element_located((By.XPATH, name_xpath))
-        )
-
-        budget_element = WebDriverWait(driver, 10).until(
-            ec.presence_of_element_located((By.XPATH, budget_xpath))
-        )
-
-        pay_element = WebDriverWait(driver, 10).until(
-            ec.presence_of_element_located((By.XPATH, pay_xpath))
-        )
-
-        university_name = name_element.text.strip()
-
-        budget_count = budget_element.text.strip()
-
-        pay_count = pay_element.text.strip()
-
-        if budget_count == "":
-            budget_count = None
-        elif budget_count is not None and budget_count.lower() == "нет":
-            budget_count = 0
-        else:
-            budget_count = int(budget_count)
-
-        if pay_count == "":
-            pay_count = None
-        elif pay_count is not None and pay_count.lower() == "нет":
-            pay_count = 0
-        else:
-            pay_count = int(pay_count)
-
-        link_element = name_element.find_element(By.XPATH, "..")
-        url = link_element.get_attribute("href")
-
-        new_entry = Moscow(
-            name=university_name,
-            budget_count=budget_count,
-            url=url,
-            pay_count=pay_count,
-        )
-        session.add(new_entry)
-
-    session.commit()
-
-    # ! информация конкретно по вузу
-    records = session.query(Moscow).all()
-
-    for record in records:
-        url = record.url
-
+        url = f"https://vuzopedia.ru/region/city/59?page={page}"
         driver.get(url)
 
-        additional_data_xpath = (
-            "/html/body/div[1]/article/div[3]/div[1]/div[2]/span"
-        )
+        university_titles = driver.find_elements(By.CLASS_NAME, "itemVuzTitle")
+        print(university_titles)
 
-        try:
-            additional_data_element = WebDriverWait(driver, 10).until(
-                ec.presence_of_element_located(
-                    (By.XPATH, additional_data_xpath)
-                )
-            )
+        add_info = driver.find_elements(By.CLASS_NAME, "col-md-2.optionVuzNew")
 
-            additional_data = additional_data_element.text.strip()
+        print(f"Страница {page}:")
 
-            record.def_conscription = additional_data
+        for i in range(len(university_titles)):
+            title_element = university_titles[i]
+            title = title_element.text.strip()
 
-            print(
-                f"Дополнительные данные для {record.name}: {additional_data}"
-            )
-
-        except Exception as e:
-            print(f"Произошла ошибка: {e}")
-            session.rollback()
-
-    # ! рейтинг вузов
-
-    driver.get("https://vuzopedia.com/rating-top-100/")
-
-    for i in range(1, 101):
-
-        rating_name_xpath_1 = f"/html/body/div[1]/section/div/div[1]/div[{i}]/article/div[2]/a/h2"
-
-        rating_name_xpath_2 = (
-            f"/html/body/div[1]/section/div/div[1]/div[{i}]/article/div[2]/h2"
-        )
-
-        rating_value_xpath_1 = (
-            f"/html/body/div/section/div/div[1]/div[{i}]/article/span"
-        )
-
-        rating_value_xpath_2 = (
-            f"/html/body/div[1]/section/div/div[1]/div[{i}]/article/span"
-        )
-
-        university_name = None
-        rating_value = None
-
-        try:
-            name_element = WebDriverWait(driver, 1).until(
-                ec.presence_of_element_located((By.XPATH, rating_name_xpath_1))
-            )
-            university_name = name_element.text.strip()
-        except Exception:
             try:
-                name_element = WebDriverWait(driver, 1).until(
-                    ec.presence_of_element_located(
-                        (By.XPATH, rating_name_xpath_2)
-                    )
-                )
-                university_name = name_element.text.strip()
+                link_element = title_element.find_element(By.XPATH, "..")
+                url = link_element.get_attribute("href")
             except Exception as e:
-                print(
-                    f"Не удалось получить название университета для индекса {i}: {e}"
-                )
+                print(f"Не удалось найти ссылку для вуза '{title}': {e}")
+                url = "нет данных"
 
-        if university_name:
-            try:
-                rating_element = WebDriverWait(driver, 1).until(
-                    ec.presence_of_element_located(
-                        (By.XPATH, rating_value_xpath_1)
-                    )
-                )
-                rating_value = int(rating_element.text.strip())
-            except Exception:
-                try:
-                    rating_element = WebDriverWait(driver, 1).until(
-                        ec.presence_of_element_located(
-                            (By.XPATH, rating_value_xpath_2)
-                        )
-                    )
-                    rating_value = int(rating_element.text.strip())
-                except Exception as e:
+            if i < len(add_info):
+                fee_info = add_info[i].text.strip()
+                coast = None
+                bud_places = None
+                bud_score = None
+                pay_places = None
+                pay_score = None
+
+                info_lines = fee_info.splitlines()
+
+                in_budget_section = False
+
+                for line in info_lines:
+                    line = line.strip()
+                    print(line)
+
+                    if line.endswith("₽"):
+                        coast = line
+
+                    if "Бюджет" in line:
+                        in_budget_section = True
+
+                    if in_budget_section:
+                        if "Платное" in line:
+                            in_budget_section = False
+
+                        if line.endswith("мест"):
+                            bud_places = line
+
+                        if line.startswith("от"):
+                            bud_score = line
+
+                    else:
+                        if line.endswith("мест"):
+                            pay_places = line
+
+                        if line.startswith("от"):
+                            pay_score = line
+
+                print(f"Название вуза: {title}")
+                print(f"URL вуза: {url}")
+                if coast:
+                    print(f"Стоимость обучения: {coast}")
+                else:
+                    print("Стоимость обучения: нет данных")
+
+                if bud_places:
+                    print(f"Бюджетные места: {bud_places}")
+                else:
+                    print("Бюджетные места: нет данных")
+
+                if bud_score:
                     print(
-                        f"Не удалось получить рейтинг для {university_name}: {e}"
+                        f"Бюджетные места (количество баллов егэ): {bud_score}"
                     )
-
-            if university_name and rating_value is not None:
-                record = (
-                    session.query(Moscow)
-                    .filter(Moscow.name == university_name)
-                    .first()
-                )
-                if record:
-
-                    record.rating = rating_value
+                else:
                     print(
-                        f"Обновлен рейтинг для {university_name}: {rating_value}"
+                        "Бюджетные места (количество баллов егэ): нет данных"
                     )
 
-    session.commit()
+                if pay_places:
+                    print(f"Платные места: {pay_places}")
+                else:
+                    print("Платные места: нет данных")
 
-    # ! получение специализаций
-    specializations = [
-        "https://vuzopedia.com/voennye/",
-        "https://vuzopedia.com/gumanitarnye/",
-        "https://vuzopedia.com/meditsinskie/",
-        "https://vuzopedia.com/pedagogicheskie/",
-        "https://vuzopedia.com/pravoohranitelnye/",
-        "https://vuzopedia.com/teatralnye/",
-        "https://vuzopedia.com/tekhnicheskie/",
-        "https://vuzopedia.com/ekonomicheskie/",
-        "https://vuzopedia.com/yuridicheskie/",
-    ]
-
-    specialization_mapping = {
-        "voennye": "spec_mil",
-        "gumanitarnye": "spec_hum",
-        "meditsinskie": "spec_med",
-        "pedagogicheskie": "spec_ped",
-        "pravoohranitelnye": "spec_enf",
-        "teatralnye": "spec_the",
-        "tekhnicheskie": "spec_tec",
-        "ekonomicheskie": "spec_eco",
-        "yuridicheskie": "spec_leg",
-    }
-
-    specialization_number = {
-        "voennye": 7,
-        "gumanitarnye": 14,
-        "meditsinskie": 5,
-        "pedagogicheskie": 17,
-        "pravoohranitelnye": 6,
-        "teatralnye": 8,
-        "tekhnicheskie": 21,
-        "ekonomicheskie": 21,
-        "yuridicheskie": 14,
-    }
-
-    for url in specializations:
-
-        specialization_name = url.split("/")[-2]
-        column_name = specialization_mapping.get(specialization_name)
-
-        if column_name:
-            try:
-
-                driver.get(url)
-
-                num_universities = specialization_number[specialization_name]
-
-                for i in range(1, num_universities + 1):
-
-                    xpath = f"/html/body/div[1]/article/div[3]/article[{i}]/a/div[2]/h3"
-                    name_element = WebDriverWait(driver, 100).until(
-                        ec.presence_of_element_located((By.XPATH, xpath))
+                if pay_score:
+                    print(
+                        f"Платные места (количество баллов егэ): {pay_score}"
                     )
-                    university_name = name_element.text.strip()
+                else:
+                    print("Платные места (количество баллов егэ): нет данных")
 
-                    record = (
-                        session.query(Moscow)
-                        .filter(Moscow.name == university_name)
-                        .first()
-                    )
-                    if record:
-                        setattr(record, column_name, True)
-                        print(
-                            f"Категория {column_name} установлена для {university_name}"
-                        )
+                print("-" * 40)
 
-                sleep(10)
+                new_university = Moscow(
+                    name=title,
+                    coast=coast,
+                    bud_places=bud_places,
+                    pay_places=pay_places,
+                    bud_score=bud_score,
+                    pay_score=pay_score,
+                    url=url,
+                )
+                session.add(new_university)
 
-            except Exception as e:
-                print(f"Ошибка при обработке URL {url}: {e}")
+            else:
+                print(f"Название вуза: {title}, Информация: нет данных")
 
-    session.commit()
+    for i in range(24):
+        url = "https://vuzopedia.ru/city/moskva"
+        driver.get(url)
 
-    driver.get("https://vuzopedia.com/moskva/")
+        cur_category_title = driver.find_elements(
+            By.CLASS_NAME, "vuzItemTitle"
+        )[i].text.strip()
+        print(cur_category_title)
 
-    for i in range(1, 175):
-        try:
+        cur_category_count = driver.find_elements(
+            By.CLASS_NAME, "cyrCountVUz"
+        )[i].text.strip()
+        cur_category_count = re.findall(r"\d+", cur_category_count)
+        if cur_category_count:
+            cur_category_count = int(cur_category_count[0])
+        else:
+            cur_category_count = 0
 
-            xpath = f"/html/body/div[1]/section/article/div[3]/article[{i}]/div/span"
-            score_element = WebDriverWait(driver, 10).until(
-                ec.presence_of_element_located((By.XPATH, xpath))
-            )
-            avg_score = score_element.text.strip()
+        print(cur_category_count)
 
-            record = session.query(Moscow).filter(Moscow.ID == i).first()
-            if record:
+        title_element = driver.find_elements(By.CLASS_NAME, "teloVuzItemMain")
+        link_element = title_element[i].find_element(By.XPATH, "..")
+        cur_url = link_element.get_attribute("href")
+        print(cur_url)
 
-                record.avg_score = avg_score
-                print(f"Заполнен avg_score для записи с ID {i}: {avg_score}")
+        category_name = cur_url.split("s=")[-1]
+        print(f"Category name for DB: {category_name}")
 
-        except Exception as e:
-            print(f"Не удалось получить avg_score для индекса {i}: {e}")
-            continue
+        column_name = f"spec_{category_name}"
+        add_column_if_not_exists("moscow", column_name)
 
+        vuz_per_page = 10
+        total_pages = (cur_category_count // vuz_per_page) + (
+            1 if cur_category_count % vuz_per_page > 0 else 0
+        )
+
+        for page in range(1, total_pages + 1):
+            page_url = f"{cur_url}&page={page}"
+            driver.get(page_url)
+
+            time.sleep(2)
+
+            vuz_titles = driver.find_elements(By.CLASS_NAME, "itemVuzTitle")
+            for title in vuz_titles:
+                vuz_name = title.text.strip()
+                print(vuz_name)
+
+                session.execute(
+                    text(
+                        f"UPDATE moscow SET {column_name} = :value WHERE name = :name"
+                    ),
+                    {"value": True, "name": vuz_name},
+                )
+
+        session.commit()
 
 finally:
     session.commit()
-    session.close()
     driver.quit()
