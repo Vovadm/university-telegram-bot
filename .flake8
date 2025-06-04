@@ -4,4 +4,4 @@ plugins = flake8-import-order, flake8-quotes, pep8-naming
 import-order-style = google
 exclude = .venv, __pycache__, .git
 inline-quotes = "
-application-import-names = app, db, utilss
+application-import-names = src, app, db, utilss

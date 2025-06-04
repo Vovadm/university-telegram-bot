@@ -8,10 +8,10 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import delete, text
 from sqlalchemy.future import select
 
-import app.keyboards as kb
-from app.keyboards import specialization_mapping
-from db.universiries import SessionLocalUniversity
-from db.users import SessionLocalUsers, Specialization, Subject, User
+import src.app.keyboards as kb
+from src.app.keyboards import specialization_mapping
+from src.db.universities import SessionLocalUniversity
+from src.db.users import SessionLocalUsers, Specialization, Subject, User
 
 
 class Form(StatesGroup):

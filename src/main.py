@@ -6,9 +6,9 @@ from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 from sqlalchemy import text
 
-from app.handlers import router
+from src.app.handlers import router
 from db.universiries import SessionLocalUniversity
-from db.users import async_main, create_tables, SessionLocalUsers
+from src.db.users import async_main, create_tables, SessionLocalUsers
 
 
 async def keep_db_connection_alive():
